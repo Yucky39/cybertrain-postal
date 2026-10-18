@@ -1,0 +1,6 @@
+ok   plain text message renders headers and a base64 body
+ok   an HTML body makes a multipart/alternative message
+ok   bcc recipients are in the envelope but never in a header
+ok   a subject with a newline cannot inject a header
+ok   a message without recipients is refused
+5 tests, 14 assertions, 0 failures

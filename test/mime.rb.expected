@@ -1,0 +1,8 @@
+ok   plain ASCII text is left alone
+ok   non-ASCII text becomes an encoded-word
+ok   long non-ASCII text splits on character boundaries
+ok   header values with CR or LF are refused
+ok   display names with specials are quoted
+ok   base64 body wraps at 76 columns with CRLF
+ok   crlf normalises line endings
+7 tests, 15 assertions, 0 failures

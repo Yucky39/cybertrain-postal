@@ -1,0 +1,14 @@
+ok   a plain delivery follows the SMTP dialogue
+ok   dot-stuffing doubles a leading dot on every line
+ok   a rejected recipient is reported and delivery continues for the rest
+ok   no accepted recipient is a failure that never sends DATA
+ok   a 4xx reply is a temporary failure
+ok   STARTTLS upgrades the stream and EHLO is repeated
+ok   a failed TLS upgrade never falls back to plain text
+ok   require_tls refuses a server that does not offer STARTTLS
+ok   credentials are never sent over an unencrypted remote connection
+ok   AUTH PLAIN over TLS sends base64 of NUL user NUL password
+ok   a loopback connection may authenticate without TLS
+ok   a rejected login is a failure
+ok   a dropped connection raises ConnectionLost
+13 tests, 30 assertions, 0 failures

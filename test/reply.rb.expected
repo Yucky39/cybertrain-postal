@@ -1,0 +1,5 @@
+ok   a single-line reply is complete
+ok   a multi-line reply completes on the space separator
+ok   a bare code is a complete reply
+ok   malformed replies are protocol errors
+4 tests, 15 assertions, 0 failures

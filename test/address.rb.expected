@@ -1,0 +1,4 @@
+ok   a plain address is accepted
+ok   a display name is encoded in the header
+ok   malformed addresses are refused
+3 tests, 14 assertions, 0 failures

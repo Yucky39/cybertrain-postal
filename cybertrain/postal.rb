@@ -1,0 +1,11 @@
+# cybertrain-postal: SMTP client library for CyberTrain (see docs/design.md).
+require "cybertrain/postal/version"
+require "cybertrain/postal/errors"
+require "cybertrain/postal/mime"
+require "cybertrain/postal/address"
+require "cybertrain/postal/message"
+require "cybertrain/postal/reply"
+require "cybertrain/postal/result"
+require "cybertrain/postal/transport"
+require "cybertrain/postal/scripted_transport"
+require "cybertrain/postal/session"
