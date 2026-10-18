@@ -1,0 +1,7 @@
+ok   read_line joins CRLF lines split across writes
+ok   a silent server ends the wait after the per-wait timeout
+ok   the overall deadline cuts a longer per-wait timeout short
+ok   a silent server makes Session raise ConnectionLost
+ok   a refused connection raises ConnectionLost
+ok   an unreachable host fails within the connect timeout
+6 tests, 11 assertions, 0 failures
