@@ -25,6 +25,7 @@ job.wait
 ```
 
 - STARTTLS is used whenever the server offers it and is never downgraded; credentials are not sent without TLS (loopback excepted).
+- Durable queue: `QueueDelivery.new(Spool.new(dir))` accepts a message onto disk (Maildir-style, one file per message); run `SpoolRunner.new(spool, factory, policy).run_once(Time.now.to_i)` from a loop or a scheduler to send, retry with backoff, and park permanent failures in `failed/`.
 - `LogDelivery` and `TestDelivery` send nothing, for development and tests.
 - Build: Spinel 2026.09.12. On macOS with Homebrew, `export LIBRARY_PATH=$(brew --prefix openssl@3)/lib CPATH=$(brew --prefix openssl@3)/include`.
 - Tests: `spin test`. End-to-end against Mailpit: `integration/run-mailpit`.
