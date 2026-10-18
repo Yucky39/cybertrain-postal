@@ -7,6 +7,7 @@ tmp=$(mktemp -d)
 pids=""
 trap 'kill $pids 2>/dev/null || true; rm -rf "$tmp"' EXIT
 
+mkdir -p build
 spinel -I . integration/mailpit.rb -o build/mailpit_check >/dev/null
 openssl req -x509 -newkey rsa:2048 -nodes -keyout "$tmp/k.pem" -out "$tmp/c.pem" \
   -days 1 -subj "/CN=localhost" 2>/dev/null
