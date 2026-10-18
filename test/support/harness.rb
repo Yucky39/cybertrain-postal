@@ -2,44 +2,56 @@
 # just to run its tests. Same shape as cybertrain/test: register cases with
 # `test "name" do ... end`, assert, end the file with PostalTest.run!.
 # Output is deterministic; `spin test` diffs it with test/<name>.rb.expected.
+# State lives in one object held by a constant, not in class variables: under
+# Spinel a class-variable array can turn into another array after a garbage
+# collection (see ../cybertrain-kaisatsu/docs/m2-notes.md).
 module PostalTest
   class Failed < StandardError
   end
 
-  @@names = [""]
-  @@blocks = [-> { nil }]
-  @@names.clear
-  @@blocks.clear
-  @@failures = 0
-  @@assertions = 0
+  class Registry
+    attr_reader :names, :blocks
+    attr_accessor :failures, :assertions
+
+    def initialize
+      @names = [""]
+      @blocks = [-> { nil }]
+      @names.clear
+      @blocks.clear
+      @failures = 0
+      @assertions = 0
+    end
+  end
+
+  STATE = Registry.new
 
   def self.register(name, block)
-    @@names << name
-    @@blocks << block
+    STATE.names << name
+    STATE.blocks << block
   end
 
   def self.count
-    @@assertions += 1
+    STATE.assertions = STATE.assertions + 1
   end
 
   def self.run!
     i = 0
-    while i < @@names.length
-      name = @@names[i]
+    while i < STATE.names.length
+      name = STATE.names[i]
       begin
-        @@blocks[i].call
+        STATE.blocks[i].call
         puts "ok   #{name}"
       rescue Failed => e
-        @@failures += 1
+        STATE.failures = STATE.failures + 1
         puts "FAIL #{name}: #{e.message}"
       rescue StandardError => e
-        @@failures += 1
+        STATE.failures = STATE.failures + 1
         puts "ERR  #{name}: #{e.class.name}"
       end
       i += 1
     end
-    puts "#{@@names.length} tests, #{@@assertions} assertions, #{@@failures} failures"
-    exit(1) if @@failures > 0
+    puts "#{STATE.names.length} tests, #{STATE.assertions} assertions, #{STATE.failures} failures"
+    exit(1) if STATE.failures > 0
   end
 end
 
