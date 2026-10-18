@@ -27,8 +27,9 @@ module Cybertrain
         raise InvalidMessage, "address is empty or too long" if n == 0 || n > MAX_LENGTH
         at = -1
         i = 0
+        raw = addr.bytes
         while i < n
-          b = addr.getbyte(i)
+          b = raw[i]
           raise InvalidMessage, "address has a control or non-ASCII byte" if b <= 32 || b >= 127
           raise InvalidMessage, "address has a forbidden character" if FORBIDDEN.include?(addr.byteslice(i, 1))
           if b == 64
@@ -39,7 +40,7 @@ module Cybertrain
         end
         raise InvalidMessage, "address needs a local part and a domain" if at < 1 || at == n - 1
         domain = addr.byteslice(at + 1, n - at - 1)
-        if domain.getbyte(0) == 46 || domain.getbyte(domain.bytesize - 1) == 46 || domain.include?("..")
+        if domain.start_with?(".") || domain.end_with?(".") || domain.include?("..")
           raise InvalidMessage, "address has a malformed domain"
         end
         addr

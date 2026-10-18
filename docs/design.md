@@ -82,4 +82,10 @@ M0 の検証で A の動作可否を最初に確認し、不可なら B と C �
 
 - M0: 完了(`docs/m0-findings.md`)。
 - M1: 完了。`Address` / `Mime` / `Message` / `Reply` / `Result` / `Session`(平文 + STARTTLS の台本テスト + AUTH PLAIN)/ `ScriptedTransport` / `Delivery`(`SmtpDelivery` / `LogDelivery` / `TestDelivery`)。テストは `test/*.rb` で、CRuby と Spinel の両方で同じ出力になる。依存方向は `script/check-dependencies` で確認する。
-- M2 の残り: 実ソケットのトランスポート(`PlainTransport` / `TlsTransport`)、AUTH LOGIN、接続タイムアウト、Mailpit での結合テスト。
+- M2: 完了(接続タイムアウトを除く)。`SocketTransport`(平文 / STARTTLS / 暗黙 TLS、`wait_readable` つき、STARTTLS 応答後の余剰バイトを拒否)、AUTH LOGIN(PLAIN が無いとき)。`integration/run-mailpit` が Mailpit に対して STARTTLS + AUTH、平文、ループバック認証を実行し、保存された件名・表示名・ドットスタッフィングを確認する。
+- 残り: 接続タイムアウト(`TCPSocket.new` は OS 任せ。`connect_nonblock` 化は未着手)、`deliver_later` と再試行方針(M3)、XOAUTH2。
+
+## 10. Spinel で踏んだ注意点
+
+- `require "openssl"` を含むプログラムでは、`String#getbyte(i)` が `OpenSSL::Buffering#getbyte` と同名のため実行時に `NoMethodError` となる(NOTES.md 規則 10・34 と同種)。`String#bytes` を 1 回取ってインデックスする。
+- `cybertrain/postal/socket_transport` は `cybertrain/postal` から require されない。メッセージと `ScriptedTransport` だけの利用者が libssl にリンクしなくて済む。macOS の Homebrew では `LIBRARY_PATH` / `CPATH` が必要。

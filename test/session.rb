@@ -137,4 +137,20 @@ test "a dropped connection raises ConnectionLost" do
   assert lost
 end
 
+test "AUTH LOGIN is used when PLAIN is not offered" do
+  script = ["220 mx", "250-mx", "250 AUTH LOGIN", "334 VXNlcm5hbWU6", "334 UGFzc3dvcmQ6", "235 ok",
+            "250 ok", "250 ok", "354 go", "250 queued", "221 bye"]
+  t = ScriptedTransport.new(script, true, false)
+  r = Session.new(t, "c", false).deliver(build, "user", "secret")
+  assert r.ok?
+  assert t.sent.include?("AUTH LOGIN\r\n" + Base64.strict_encode64("user") + "\r\n" + Base64.strict_encode64("secret") + "\r\n")
+end
+
+test "no supported AUTH mechanism is a 504 failure" do
+  script = ["220 mx", "250-mx", "250 AUTH CRAM-MD5", "221 bye"]
+  r = Session.new(ScriptedTransport.new(script, true, false), "c", false).deliver(build, "user", "secret")
+  assert !r.ok?
+  assert_equal 504, r.code
+end
+
 PostalTest.run!

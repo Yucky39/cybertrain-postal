@@ -11,4 +11,6 @@ ok   AUTH PLAIN over TLS sends base64 of NUL user NUL password
 ok   a loopback connection may authenticate without TLS
 ok   a rejected login is a failure
 ok   a dropped connection raises ConnectionLost
-13 tests, 30 assertions, 0 failures
+ok   AUTH LOGIN is used when PLAIN is not offered
+ok   no supported AUTH mechanism is a 504 failure
+15 tests, 34 assertions, 0 failures
