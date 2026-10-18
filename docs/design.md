@@ -77,3 +77,9 @@ M0 の検証で A の動作可否を最初に確認し、不可なら B と C �
 2. 別セッションで決めた用語・API があれば反映する(本書の命名は仮)。
 3. ライセンス: MIT(決定済み)。
 4. README の説明から「認証」を外した(決定済み)。
+
+## 9. 進捗
+
+- M0: 完了(`docs/m0-findings.md`)。
+- M1: 完了。`Address` / `Mime` / `Message` / `Reply` / `Result` / `Session`(平文 + STARTTLS の台本テスト + AUTH PLAIN)/ `ScriptedTransport` / `Delivery`(`SmtpDelivery` / `LogDelivery` / `TestDelivery`)。テストは `test/*.rb` で、CRuby と Spinel の両方で同じ出力になる。依存方向は `script/check-dependencies` で確認する。
+- M2 の残り: 実ソケットのトランスポート(`PlainTransport` / `TlsTransport`)、AUTH LOGIN、接続タイムアウト、Mailpit での結合テスト。
