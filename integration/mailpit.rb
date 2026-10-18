@@ -15,7 +15,7 @@ m.text_body = "こんにちは。\r\n.この行は先頭がドットです。\r\
 m.date = "Sun, 18 Oct 2026 10:00:00 +0900"
 m.message_id = mode + "@example.com"
 
-transport = SocketTransport.new("127.0.0.1", port, false, 5, false)
+transport = SocketTransport.new("127.0.0.1", port, false, 5, 5, 30, false)
 username = mode == "plain" ? "" : "user"
 password = mode == "plain" ? "" : "secret"
 delivery = SmtpDelivery.new(transport, "client.example.com", username, password, mode == "starttls")

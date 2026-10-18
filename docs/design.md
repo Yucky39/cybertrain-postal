@@ -83,7 +83,8 @@ M0 の検証で A の動作可否を最初に確認し、不可なら B と C �
 - M0: 完了(`docs/m0-findings.md`)。
 - M1: 完了。`Address` / `Mime` / `Message` / `Reply` / `Result` / `Session`(平文 + STARTTLS の台本テスト + AUTH PLAIN)/ `ScriptedTransport` / `Delivery`(`SmtpDelivery` / `LogDelivery` / `TestDelivery`)。テストは `test/*.rb` で、CRuby と Spinel の両方で同じ出力になる。依存方向は `script/check-dependencies` で確認する。
 - M2: 完了(接続タイムアウトを除く)。`SocketTransport`(平文 / STARTTLS / 暗黙 TLS、`wait_readable` つき、STARTTLS 応答後の余剰バイトを拒否)、AUTH LOGIN(PLAIN が無いとき)。`integration/run-mailpit` が Mailpit に対して STARTTLS + AUTH、平文、ループバック認証を実行し、保存された件名・表示名・ドットスタッフィングを確認する。
-- 残り: 接続タイムアウト(`TCPSocket.new` は OS 任せ。`connect_nonblock` 化は未着手)、`deliver_later` と再試行方針(M3)、XOAUTH2。
+- 接続タイムアウト: 完了。`SocketTransport` は connect / 待機ごと / 全体の 3 種の期限を持つ(`test/socket_transport.rb`)。macOS では拒否された接続も「書き込み可」になるため、`SO_ERROR` で確認する。
+- 残り: `deliver_later` と再試行方針(M3)、XOAUTH2。
 
 ## 10. Spinel で踏んだ注意点
 
