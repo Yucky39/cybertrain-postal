@@ -2,6 +2,7 @@ require "securerandom"
 require "cybertrain/postal/errors"
 require "cybertrain/postal/mime"
 require "cybertrain/postal/address"
+require "cybertrain/postal/attachment"
 
 module Cybertrain
   module Postal
@@ -10,7 +11,7 @@ module Cybertrain
     # defaults come from Message.fresh_*).
     class Message
       attr_accessor :from, :subject, :text_body, :html_body, :date, :message_id, :boundary
-      attr_reader :to, :cc, :bcc
+      attr_reader :to, :cc, :bcc, :attachments
 
       def initialize(from)
         @from = from
@@ -26,6 +27,12 @@ module Cybertrain
         @date = ""
         @message_id = ""
         @boundary = ""
+        @attachments = Array.new(0) { Attachment.new("", "", "", "") }
+      end
+
+      def attach(attachment)
+        @attachments << attachment
+        nil
       end
 
       def add_to(address)
@@ -77,26 +84,85 @@ module Cybertrain
         out << "Subject: " << Mime.encode_text(@subject) << "\r\n"
         out << "Message-ID: <" << mid << ">\r\n"
         out << "MIME-Version: 1.0\r\n"
-        if @html_body.bytesize == 0
-          out << "Content-Type: text/plain; charset=UTF-8\r\n"
-          out << "Content-Transfer-Encoding: base64\r\n\r\n"
-          out << Mime.base64_body(Mime.crlf(@text_body))
-        else
-          boundary = @boundary.bytesize == 0 ? "=_postal_" + Message.fresh_token : @boundary
-          Mime.check_header_value(boundary)
-          out << "Content-Type: multipart/alternative; boundary=\"" << boundary << "\"\r\n\r\n"
-          out << "--" << boundary << "\r\n"
-          out << "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
-          out << Mime.base64_body(Mime.crlf(@text_body))
-          out << "--" << boundary << "\r\n"
-          out << "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
-          out << Mime.base64_body(Mime.crlf(@html_body))
-          out << "--" << boundary << "--\r\n"
-        end
+        base = @boundary.bytesize == 0 ? "=_postal_" + Message.fresh_token : @boundary
+        Mime.check_header_value(base)
+        out << body_entity(base)
         out
       end
 
       private
+
+      def text_entity
+        "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" +
+          Mime.base64_body(Mime.crlf(@text_body))
+      end
+
+      def html_entity
+        "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" +
+          Mime.base64_body(Mime.crlf(@html_body))
+      end
+
+      def alternative_entity(boundary)
+        out = +""
+        out << "Content-Type: multipart/alternative; boundary=\"" << boundary << "\"\r\n\r\n"
+        out << "--" << boundary << "\r\n" << text_entity
+        out << "--" << boundary << "\r\n" << html_entity
+        out << "--" << boundary << "--\r\n"
+        out
+      end
+
+      def attachment_entity(att)
+        disposition = att.inline? ? "inline" : "attachment"
+        out = +""
+        out << "Content-Type: " << att.content_type << "; " << Mime.param("name", att.filename) << "\r\n"
+        out << "Content-Transfer-Encoding: base64\r\n"
+        out << "Content-Disposition: " << disposition << "; " << Mime.param("filename", att.filename) << "\r\n"
+        out << "Content-ID: <" << att.content_id << ">\r\n" if att.inline?
+        out << "\r\n"
+        out << Mime.base64_body(att.data)
+        out
+      end
+
+      # The message body as a MIME entity (its own Content-Type header
+      # included). Structure, outermost first:
+      #   multipart/mixed       when there are ordinary attachments
+      #   multipart/related     when inline parts accompany an HTML body
+      #   multipart/alternative when there is an HTML body next to the text
+      def body_entity(base)
+        inline = [@attachments[0]]
+        inline.clear
+        regular = [@attachments[0]]
+        regular.clear
+        @attachments.each do |att|
+          if att.inline? && @html_body.bytesize > 0
+            inline << att
+          else
+            regular << att
+          end
+        end
+
+        core = +""
+        if @html_body.bytesize == 0
+          core << text_entity
+        elsif inline.empty?
+          core << alternative_entity(base)
+        else
+          rel = base + "_rel"
+          core << "Content-Type: multipart/related; boundary=\"" << rel << "\"\r\n\r\n"
+          core << "--" << rel << "\r\n" << alternative_entity(base)
+          inline.each { |att| core << "--" << rel << "\r\n" << attachment_entity(att) }
+          core << "--" << rel << "--\r\n"
+        end
+        return core if regular.empty?
+
+        mix = base + "_mix"
+        out = +""
+        out << "Content-Type: multipart/mixed; boundary=\"" << mix << "\"\r\n\r\n"
+        out << "--" << mix << "\r\n" << core
+        regular.each { |att| out << "--" << mix << "\r\n" << attachment_entity(att) }
+        out << "--" << mix << "--\r\n"
+        out
+      end
 
       def join_addresses(list)
         parts = [""]

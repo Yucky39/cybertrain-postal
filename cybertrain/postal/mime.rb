@@ -83,6 +83,34 @@ module Cybertrain
         name
       end
 
+      # A MIME header parameter: name="value" for printable ASCII, otherwise
+      # an ASCII fallback plus the RFC 2231 name*=UTF-8''percent-encoded form.
+      def self.param(name, value)
+        check_header_value(value)
+        if plain_ascii?(value)
+          return name + "=\"" + value.gsub("\\", "\\\\").gsub("\"", "\\\"") + "\""
+        end
+        fallback = +""
+        value.each_char { |c| fallback << (c.bytesize == 1 ? c : "_") }
+        fallback = fallback.gsub("\\", "_").gsub("\"", "_")
+        name + "=\"" + fallback + "\"; " + name + "*=UTF-8''" + percent_encode(value)
+      end
+
+      # RFC 5987 attr-char stays as is; every other byte becomes %XX.
+      def self.percent_encode(text)
+        keep = "!#$&+-.^_`|~"
+        out = +""
+        text.bytes.each do |b|
+          alnum = (b >= 48 && b <= 57) || (b >= 65 && b <= 90) || (b >= 97 && b <= 122)
+          if alnum || (b < 128 && keep.include?(b.chr))
+            out << b.chr
+          else
+            out << "%" << "0123456789ABCDEF"[b / 16] << "0123456789ABCDEF"[b % 16]
+          end
+        end
+        out
+      end
+
       # Base64 of the text, wrapped at 76 characters, each line ending CRLF.
       def self.base64_body(text)
         encoded = Base64.strict_encode64(text)

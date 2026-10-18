@@ -13,4 +13,11 @@ ok   a rejected login is a failure
 ok   a dropped connection raises ConnectionLost
 ok   AUTH LOGIN is used when PLAIN is not offered
 ok   no supported AUTH mechanism is a 504 failure
-15 tests, 34 assertions, 0 failures
+ok   XOAUTH2 sends user and bearer token
+ok   a rejected XOAUTH2 token is answered with an empty line, then 535
+ok   XOAUTH2 is a 504 failure when the server does not offer it
+ok   XOAUTH2 tokens are not sent without TLS
+ok   automatic mode never picks XOAUTH2
+ok   a message larger than the advertised SIZE is refused before MAIL FROM
+ok   MAIL FROM carries SIZE when the server advertises it
+22 tests, 49 assertions, 0 failures

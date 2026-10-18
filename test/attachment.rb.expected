@@ -1,0 +1,12 @@
+ok   an ASCII parameter is quoted and escaped
+ok   a non-ASCII parameter gets an ASCII fallback and an RFC 2231 form
+ok   filenames with control characters or path separators are refused
+ok   malformed content types and content ids are refused
+ok   one attachment makes a multipart/mixed message
+ok   an HTML body with an attachment nests alternative inside mixed
+ok   an inline part with an HTML body makes multipart/related
+ok   inline and ordinary attachments together nest related inside mixed
+ok   an inline part without an HTML body is sent as an ordinary attachment
+ok   a Japanese filename is carried in both parameters
+ok   rendering without attachments is unchanged
+11 tests, 36 assertions, 0 failures

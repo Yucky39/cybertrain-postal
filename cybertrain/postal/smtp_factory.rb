@@ -12,7 +12,7 @@ module Cybertrain
     #   mailer = RetryingDelivery.new(factory, RetryPolicy.new(5, 2.0, 60.0), SystemSleeper.new)
     #   mailer.deliver_later(message)
     class SmtpDeliveryFactory < DeliveryFactory
-      attr_writer :connect_timeout, :timeout, :total_timeout, :verify_cert, :require_tls
+      attr_writer :connect_timeout, :timeout, :total_timeout, :verify_cert, :require_tls, :auth_mechanism
 
       def initialize(host, port, implicit_tls, local_hostname)
         @host = host
@@ -26,8 +26,12 @@ module Cybertrain
         @total_timeout = 120
         @verify_cert = true
         @require_tls = true
+        @auth_mechanism = ""
       end
 
+      # For XOAUTH2 set `auth_mechanism = "XOAUTH2"` and pass the access token
+      # as the password. Call credentials again when the token is renewed: each
+      # attempt (including retries) reads the current values.
       def credentials(username, password)
         @username = username
         @password = password
@@ -36,7 +40,9 @@ module Cybertrain
 
       def new_delivery
         transport = SocketTransport.new(@host, @port, @implicit_tls, @connect_timeout, @timeout, @total_timeout, @verify_cert)
-        SmtpDelivery.new(transport, @local_hostname, @username, @password, @require_tls)
+        delivery = SmtpDelivery.new(transport, @local_hostname, @username, @password, @require_tls)
+        delivery.auth_mechanism = @auth_mechanism
+        delivery
       end
     end
   end

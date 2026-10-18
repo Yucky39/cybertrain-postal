@@ -80,16 +80,21 @@ module Cybertrain
     # delivery; a connection factory for repeated sends arrives with the
     # socket transports (M2).
     class SmtpDelivery < Delivery
+      attr_writer :auth_mechanism
+
       def initialize(transport, local_hostname, username, password, require_tls)
         @transport = transport
         @local_hostname = local_hostname
         @username = username
         @password = password
         @require_tls = require_tls
+        @auth_mechanism = ""
       end
 
       def perform(message)
-        Session.new(@transport, @local_hostname, @require_tls).deliver(message, @username, @password)
+        session = Session.new(@transport, @local_hostname, @require_tls)
+        session.auth_mechanism = @auth_mechanism
+        session.deliver(message, @username, @password)
       end
     end
 
