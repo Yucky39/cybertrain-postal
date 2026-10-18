@@ -1,0 +1,10 @@
+#!/bin/sh
+# cybertrain-postal must not depend on CyberTrain itself (docs/design.md section 2):
+# every `require "cybertrain/..."` under cybertrain/ has to name cybertrain/postal.
+bad=$(grep -rnE 'require +"cybertrain/' cybertrain | grep -vE 'require +"cybertrain/postal(/|")')
+if [ -n "$bad" ]; then
+  echo "forbidden dependency on CyberTrain:" >&2
+  echo "$bad" >&2
+  exit 1
+fi
+echo "ok: no dependency on CyberTrain"

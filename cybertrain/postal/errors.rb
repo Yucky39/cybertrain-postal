@@ -22,5 +22,9 @@ module Cybertrain
     # Refused to continue without TLS, or TLS could not be established.
     class InsecureConnection < PostalError
     end
+
+    # deliver! got a failed Result. The message reads "<code> <text>".
+    class DeliveryFailed < PostalError
+    end
   end
 end

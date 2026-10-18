@@ -1,0 +1,8 @@
+ok   SmtpDelivery#deliver returns the Result
+ok   deliver! returns the Result on success
+ok   deliver! raises DeliveryFailed with code and text
+ok   deliver reports a permanent failure without raising
+ok   TestDelivery records messages and sends nothing
+ok   LogDelivery logs counts only
+ok   a Delivery subclass without perform fails cleanly
+7 tests, 18 assertions, 0 failures
