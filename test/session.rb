@@ -153,4 +153,73 @@ test "no supported AUTH mechanism is a 504 failure" do
   assert_equal 504, r.code
 end
 
+test "XOAUTH2 sends user and bearer token" do
+  script = ["220 mx", "250-mx", "250 AUTH XOAUTH2 PLAIN", "235 ok", "250 ok", "250 ok", "354 go", "250 queued", "221 bye"]
+  t = ScriptedTransport.new(script, true, false)
+  s = Session.new(t, "c", false)
+  s.auth_mechanism = "XOAUTH2"
+  r = s.deliver(build, "user@example.com", "ya29.token")
+  assert r.ok?
+  raw = "user=user@example.com\1auth=Bearer ya29.token\1\1"
+  assert t.sent.include?("AUTH XOAUTH2 " + Base64.strict_encode64(raw) + "\r\n")
+  assert !t.sent.include?("AUTH PLAIN")
+end
+
+test "a rejected XOAUTH2 token is answered with an empty line, then 535" do
+  script = ["220 mx", "250-mx", "250 AUTH XOAUTH2", "334 eyJzdGF0dXMiOiI0MDEifQ==", "535 token expired", "221 bye"]
+  t = ScriptedTransport.new(script, true, false)
+  s = Session.new(t, "c", false)
+  s.auth_mechanism = "XOAUTH2"
+  r = s.deliver(build, "user@example.com", "old")
+  assert !r.ok?
+  assert_equal 535, r.code
+  raw = "user=user@example.com\1auth=Bearer old\1\1"
+  assert t.sent.include?("AUTH XOAUTH2 " + Base64.strict_encode64(raw) + "\r\n\r\nQUIT\r\n")
+end
+
+test "XOAUTH2 is a 504 failure when the server does not offer it" do
+  script = ["220 mx", "250-mx", "250 AUTH PLAIN LOGIN", "221 bye"]
+  s = Session.new(ScriptedTransport.new(script, true, false), "c", false)
+  s.auth_mechanism = "XOAUTH2"
+  r = s.deliver(build, "u", "token")
+  assert_equal 504, r.code
+end
+
+test "XOAUTH2 tokens are not sent without TLS" do
+  t = ScriptedTransport.new(["220 mx", "250-mx", "250 AUTH XOAUTH2"], false, false)
+  s = Session.new(t, "c", false)
+  s.auth_mechanism = "XOAUTH2"
+  refused = false
+  begin
+    s.deliver(build, "u", "token")
+  rescue InsecureConnection
+    refused = true
+  end
+  assert refused
+  assert !t.sent.include?("AUTH")
+end
+
+test "automatic mode never picks XOAUTH2" do
+  script = ["220 mx", "250-mx", "250 AUTH XOAUTH2", "221 bye"]
+  r = Session.new(ScriptedTransport.new(script, true, false), "c", false).deliver(build, "u", "p")
+  assert_equal 504, r.code
+end
+
+test "a message larger than the advertised SIZE is refused before MAIL FROM" do
+  script = ["220 mx", "250-mx", "250 SIZE 100", "221 bye"]
+  t = ScriptedTransport.new(script, false, false)
+  r = Session.new(t, "c", false).deliver(build, "", "")
+  assert !r.ok?
+  assert_equal 552, r.code
+  assert !t.sent.include?("MAIL FROM")
+end
+
+test "MAIL FROM carries SIZE when the server advertises it" do
+  script = ["220 mx", "250-mx", "250 SIZE 10485760", "250 ok", "250 ok", "354 go", "250 queued", "221 bye"]
+  t = ScriptedTransport.new(script, false, false)
+  r = Session.new(t, "c", false).deliver(build, "", "")
+  assert r.ok?
+  assert t.sent.include?("MAIL FROM:<noreply@example.com> SIZE=" + build.render.bytesize.to_s + "\r\n")
+end
+
 PostalTest.run!

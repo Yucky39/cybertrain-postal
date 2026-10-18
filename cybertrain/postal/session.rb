@@ -15,10 +15,15 @@ module Cybertrain
     # text. require_tls also refuses a server that does not offer STARTTLS.
     # Credentials are only sent over an encrypted or loopback transport.
     class Session
+      # "" picks PLAIN or LOGIN by what the server offers. "XOAUTH2" treats the
+      # password argument of deliver as an OAuth2 access token.
+      attr_writer :auth_mechanism
+
       def initialize(transport, local_hostname, require_tls)
         @transport = transport
         @host = local_hostname
         @require_tls = require_tls
+        @auth_mechanism = ""
       end
 
       def deliver(message, username, password)
@@ -53,7 +58,12 @@ module Cybertrain
           return failure(auth) unless auth.code == 235
         end
 
-        from = command("MAIL FROM:<" + message.from.addr + ">")
+        limit = size_limit(caps)
+        if limit > 0 && body.bytesize > limit
+          return failure_text(552, "message of " + body.bytesize.to_s + " bytes exceeds the server limit of " + limit.to_s)
+        end
+        size_param = offers_size?(caps) ? " SIZE=" + body.bytesize.to_s : ""
+        from = command("MAIL FROM:<" + message.from.addr + ">" + size_param)
         return failure(from) unless from.code == 250
 
         accepted = [""]
@@ -113,6 +123,9 @@ module Cybertrain
       # AUTH PLAIN when offered, else AUTH LOGIN. Answers the final reply; a
       # missing mechanism answers a synthetic 504.
       def authenticate(caps, username, password)
+        if @auth_mechanism == "XOAUTH2"
+          return authenticate_xoauth2(caps, username, password)
+        end
         if offers_auth?(caps, "PLAIN")
           token = Base64.strict_encode64("\0" + username + "\0" + password)
           return command("AUTH PLAIN " + token)
@@ -126,6 +139,20 @@ module Cybertrain
         end
         reply = Reply.new
         reply.add_line("504 server offers no supported AUTH mechanism")
+        reply
+      end
+
+      # AUTH XOAUTH2 (Google / Microsoft). On a rejected token the server
+      # answers 334 with a base64 JSON error; an empty line gets the final 535.
+      def authenticate_xoauth2(caps, username, token)
+        unless offers_auth?(caps, "XOAUTH2")
+          reply = Reply.new
+          reply.add_line("504 server does not offer XOAUTH2")
+          return reply
+        end
+        raw = "user=" + username + "\1auth=Bearer " + token + "\1\1"
+        reply = command("AUTH XOAUTH2 " + Base64.strict_encode64(raw))
+        reply = command("") if reply.code == 334
         reply
       end
 
@@ -151,6 +178,23 @@ module Cybertrain
           return true if line.upcase == keyword
         end
         false
+      end
+
+      def offers_size?(caps)
+        caps.each do |line|
+          up = line.upcase
+          return true if up == "SIZE" || up.start_with?("SIZE ")
+        end
+        false
+      end
+
+      # The server's SIZE limit in bytes, 0 when it states none (RFC 1870).
+      def size_limit(caps)
+        caps.each do |line|
+          up = line.upcase
+          return up.byteslice(5, up.bytesize - 5).to_i if up.start_with?("SIZE ")
+        end
+        0
       end
 
       def offers_auth?(caps, mechanism)

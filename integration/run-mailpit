@@ -31,6 +31,7 @@ check "plain"         ./build/mailpit_check plain 12026
 check "auth(loopback)" ./build/mailpit_check auth 12026
 check "deliver_later+retry" ./build/mailpit_check later 12025
 check "spool + runner" ./build/mailpit_check spool 12025
+check "attachments" ./build/mailpit_check attach 12025
 check "retry on lost connection" ./build/mailpit_check retry 12999
 
 # What the server stored.
@@ -48,4 +49,15 @@ case "$body" in
   *".この行は先頭がドットです。"*) echo "ok   dot-stuffing round trip" ;;
   *) echo "FAIL dot-stuffing: $body"; fail=1 ;;
 esac
+id=$(curl -s "http://127.0.0.1:18025/api/v1/search?query=subject:attach" | python3 -c 'import json,sys; print(json.load(sys.stdin)["messages"][0]["ID"])')
+curl -s "http://127.0.0.1:18025/api/v1/message/$id" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+att = d["Attachments"]
+inl = d["Inline"]
+names = [a["FileName"] for a in att]
+ok = names == ["請求書 2026.pdf"] and att[0]["Size"] == 4000 and len(inl) == 1 and inl[0]["ContentID"] == "logo1" and inl[0]["Size"] == 4000
+print("ok   attachment round trip:" if ok else "FAIL attachment round trip:", names, [a["Size"] for a in att], [(i["ContentID"], i["Size"]) for i in inl])
+sys.exit(0 if ok else 1)
+' || fail=1
 exit $fail

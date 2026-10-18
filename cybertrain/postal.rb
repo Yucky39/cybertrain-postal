@@ -2,6 +2,7 @@
 require "cybertrain/postal/version"
 require "cybertrain/postal/errors"
 require "cybertrain/postal/mime"
+require "cybertrain/postal/attachment"
 require "cybertrain/postal/address"
 require "cybertrain/postal/message"
 require "cybertrain/postal/reply"
