@@ -20,9 +20,59 @@ module Cybertrain
         result
       end
 
+      # Runs the delivery on its own thread and answers a DeliveryJob at once.
+      # Whatever perform raises ends up in the job as a failed Result (code 0),
+      # never in the caller. Use a Delivery that can serve concurrent calls
+      # (RetryingDelivery builds a fresh transport per attempt).
+      def deliver_later(message)
+        job = DeliveryJob.new
+        start_job(job, message)
+        job
+      end
+
       # Abstract hook (spikes/NOTES.md rule 3).
       def perform(message)
         Result.new(false, 0, "perform is not implemented", [""].clear, [""].clear)
+      end
+
+      def start_job(job, message)
+        Thread.new { run_job(job, message) }
+        nil
+      end
+
+      def run_job(job, message)
+        begin
+          job.finish(perform(message))
+        rescue PostalError
+          job.finish(Result.new(false, 0, "delivery raised an error", [""].clear, [""].clear))
+        rescue StandardError
+          job.finish(Result.new(false, 0, "delivery raised an unexpected error", [""].clear, [""].clear))
+        end
+        nil
+      end
+    end
+
+    # The handle deliver_later returns.
+    class DeliveryJob
+      def initialize
+        @done = false
+        @result = Result.new(false, 0, "pending", [""].clear, [""].clear)
+      end
+
+      def finish(result)
+        @result = result
+        @done = true
+        nil
+      end
+
+      def done?
+        @done
+      end
+
+      # Blocks (yielding to other threads) until the delivery has finished.
+      def wait
+        sleep(0.005) until @done
+        @result
       end
     end
 

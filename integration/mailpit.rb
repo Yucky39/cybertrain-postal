@@ -1,7 +1,7 @@
 # End-to-end check against a running Mailpit; run via integration/run-mailpit.
-# usage: mailpit_check MODE PORT   (MODE: plain | starttls | auth)
+# usage: mailpit_check MODE PORT   (MODE: plain | starttls | auth | later | retry)
 require "cybertrain/postal"
-require "cybertrain/postal/socket_transport"
+require "cybertrain/postal/smtp_factory"
 
 include Cybertrain::Postal
 
@@ -15,10 +15,23 @@ m.text_body = "こんにちは。\r\n.この行は先頭がドットです。\r\
 m.date = "Sun, 18 Oct 2026 10:00:00 +0900"
 m.message_id = mode + "@example.com"
 
-transport = SocketTransport.new("127.0.0.1", port, false, 5, 5, 30, false)
-username = mode == "plain" ? "" : "user"
-password = mode == "plain" ? "" : "secret"
-delivery = SmtpDelivery.new(transport, "client.example.com", username, password, mode == "starttls")
-r = delivery.deliver(m)
-puts "ok=#{r.ok?} code=#{r.code} tls=#{transport.secure?}"
+factory = SmtpDeliveryFactory.new("127.0.0.1", port, false, "client.example.com")
+factory.verify_cert = false
+factory.require_tls = (mode == "starttls" || mode == "later")
+factory.credentials("user", "secret") unless mode == "plain" || mode == "retry"
+factory.timeout = 5
+factory.connect_timeout = 2
+
+if mode == "retry"
+  # nothing listens on this port: every attempt loses the connection
+  sleeper = Sleeper.new
+  retrying = RetryingDelivery.new(factory, RetryPolicy.new(3, 0.1, 1.0), sleeper)
+  r = retrying.deliver(m)
+  puts "ok=#{r.ok?} code=#{r.code} attempts=#{retrying.attempts}"
+  exit(r.code == 421 && retrying.attempts == 3 ? 0 : 1)
+end
+
+retrying = RetryingDelivery.new(factory, RetryPolicy.new(3, 0.1, 1.0), SystemSleeper.new)
+r = mode == "later" ? retrying.deliver_later(m).wait : retrying.deliver(m)
+puts "ok=#{r.ok?} code=#{r.code} attempts=#{retrying.attempts}"
 exit(1) unless r.ok?
