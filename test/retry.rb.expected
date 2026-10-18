@@ -1,0 +1,11 @@
+ok   the backoff doubles and is capped
+ok   a temporary failure is retried until it succeeds
+ok   a permanent failure is not retried
+ok   retries stop at max_attempts and answer the last failure
+ok   a lost connection is retried as a temporary failure
+ok   a lost connection that never recovers answers 421
+ok   an invalid message is raised at once, not retried
+ok   deliver_later answers a job that finishes with the Result
+ok   an error inside deliver_later ends up in the job, not the caller
+ok   several jobs run side by side
+10 tests, 22 assertions, 0 failures
