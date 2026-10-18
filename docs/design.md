@@ -86,4 +86,5 @@ M0 の検証で A の動作可否を最初に確認し、不可なら B と C �
 - 接続タイムアウト: 完了。`SocketTransport` は connect / 待機ごと / 全体の 3 種の期限を持つ(`test/socket_transport.rb`)。macOS では拒否された接続も「書き込み可」になるため、`SO_ERROR` で確認する。
 - M3: 完了(テンプレート連携を除く)。`RetryPolicy`(指数バックオフ、上限つき、ジッタなし)、`RetryingDelivery`(4xx と接続断=421 を再試行、5xx と `InvalidMessage` / `InsecureConnection` / `ProtocolError` は再試行しない)、`DeliveryFactory` / `SmtpDeliveryFactory`(試行ごとに新しいトランスポート)、`Delivery#deliver_later` と `DeliveryJob`(スレッド内の例外はジョブの失敗 Result になる)。`test/retry.rb` は Spinel で 30 回繰り返して安定していた。
 - テンプレート連携: このライブラリには入れない。CyberTrain 側でテンプレートを描画し、`Message#text_body` / `html_body` に渡す薄い層を、CyberTrain のリポジトリか別パッケージに置く(本体に依存させないため)。
-- 残り: XOAUTH2、添付ファイル、キューの永続化。
+- キューの永続化: 完了。保存先は SQLite ではなくファイルスプール(Maildir 型)にした。依存が増えず、状態遷移が `rename` 一回で原子的になり、Spinel の File / Dir だけで書ける。`Spool`(`tmp/` `new/` `active/` `failed/`)、`SpoolItem`(封筒 + 再試行状態 + 描画済みデータを 1 ファイルに)、`QueueDelivery`(受理して 250 を返すだけ)、`SpoolRunner#run_once(now)`(1 通につき 1 回試行。4xx と接続断は `RetryPolicy` のバックオフで再スケジュール、上限到達と 5xx は `failed/` へ)、`Spool#recover_stale`(落ちたワーカーの `active/` を戻す)。Bcc は封筒にだけ残る。`test/spool.rb`、`integration/run-mailpit` の `spool` で確認。
+- 残り: XOAUTH2(#2)、添付ファイル(#1)。

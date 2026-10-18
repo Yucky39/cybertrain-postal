@@ -29,6 +29,7 @@ check "starttls+auth" ./build/mailpit_check starttls 12025
 check "plain"         ./build/mailpit_check plain 12026
 check "auth(loopback)" ./build/mailpit_check auth 12026
 check "deliver_later+retry" ./build/mailpit_check later 12025
+check "spool + runner" ./build/mailpit_check spool 12025
 check "retry on lost connection" ./build/mailpit_check retry 12999
 
 # What the server stored.

@@ -1,0 +1,11 @@
+ok   enqueue stores the message and the runner delivers it once
+ok   bcc recipients stay in the envelope but out of the headers
+ok   a temporary failure is rescheduled with backoff
+ok   a lost connection counts as temporary
+ok   a permanent failure moves to failed at once
+ok   the message is given up after max_attempts
+ok   claim is exclusive
+ok   stale claimed messages are put back
+ok   oldest messages are delivered first
+ok   QueueDelivery answers 250 queued and leaves the work to the runner
+10 tests, 38 assertions, 0 failures
