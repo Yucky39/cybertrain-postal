@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  # Same release CyberTrain pins; see docs/m0-findings.md.
+  SPINEL_TAG: "2026.09.12"
+  MAILPIT_VERSION: "v1.31.6"
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Install libssl (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+
+      - name: Point the compiler at Homebrew openssl (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          prefix=$(brew --prefix openssl@3)
+          echo "LIBRARY_PATH=$prefix/lib" >> "$GITHUB_ENV"
+          echo "CPATH=$prefix/include" >> "$GITHUB_ENV"
+
+      - name: Library does not depend on CyberTrain
+        run: script/check-dependencies
+
+      - name: Name the runner image
+        id: image
+        run: echo "id=${ImageOS:-unknown}-${ImageVersion:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the Spinel toolchain
+        id: spinel-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.local
+          key: spinel-${{ env.SPINEL_TAG }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.id }}
+
+      - name: Build Spinel
+        if: steps.spinel-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/src
+          git clone --branch "$SPINEL_TAG" --depth 1 https://github.com/matz/spinel.git ~/.local/src/spinel
+          cd ~/.local/src/spinel
+          make deps
+          make -j4
+          make install PREFIX="$HOME/.local"
+
+      - name: Save the Spinel toolchain
+        if: steps.spinel-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.local
+          key: spinel-${{ env.SPINEL_TAG }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.id }}
+
+      - name: Tests under CRuby (the oracle)
+        run: |
+          for t in test/*.rb; do
+            ruby -I. "$t" | diff - "$t.expected" || { echo "CRuby output differs: $t"; exit 1; }
+          done
+
+      - name: Tests under Spinel
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          spin test
+
+  mailpit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install libssl and Mailpit
+        run: |
+          sudo apt-get update && sudo apt-get install -y libssl-dev
+          curl -fsSL -o /tmp/mailpit.tar.gz \
+            "https://github.com/axllent/mailpit/releases/download/${MAILPIT_VERSION}/mailpit-linux-amd64.tar.gz"
+          tar -xzf /tmp/mailpit.tar.gz -C /tmp mailpit
+          sudo install -m 755 /tmp/mailpit /usr/local/bin/mailpit
+
+      - name: Name the runner image
+        id: image
+        run: echo "id=${ImageOS:-unknown}-${ImageVersion:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the Spinel toolchain
+        id: spinel-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.local
+          key: spinel-${{ env.SPINEL_TAG }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.id }}
+
+      - name: Build Spinel
+        if: steps.spinel-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/src
+          git clone --branch "$SPINEL_TAG" --depth 1 https://github.com/matz/spinel.git ~/.local/src/spinel
+          cd ~/.local/src/spinel
+          make deps
+          make -j4
+          make install PREFIX="$HOME/.local"
+
+      - name: Save the Spinel toolchain
+        if: steps.spinel-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.local
+          key: spinel-${{ env.SPINEL_TAG }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.id }}
+
+      - name: End-to-end against Mailpit
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          integration/run-mailpit
