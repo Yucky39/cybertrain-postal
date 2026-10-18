@@ -1,0 +1,47 @@
+#!/bin/sh
+# Runs the Mailpit end-to-end checks. Needs: spinel on PATH, mailpit, openssl,
+# curl, python3. On macOS also LIBRARY_PATH/CPATH pointing at Homebrew openssl@3.
+set -eu
+cd "$(dirname "$0")/.."
+tmp=$(mktemp -d)
+pids=""
+trap 'kill $pids 2>/dev/null || true; rm -rf "$tmp"' EXIT
+
+spinel -I . integration/mailpit.rb -o build/mailpit_check >/dev/null
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$tmp/k.pem" -out "$tmp/c.pem" \
+  -days 1 -subj "/CN=localhost" 2>/dev/null
+
+# A: STARTTLS + AUTH.  B: plain SMTP, no TLS offered.
+mailpit --smtp 127.0.0.1:12025 --listen 127.0.0.1:18025 --database "$tmp/a.db" \
+  --smtp-tls-cert "$tmp/c.pem" --smtp-tls-key "$tmp/k.pem" --smtp-auth-accept-any >/dev/null 2>&1 &
+pids="$pids $!"
+mailpit --smtp 127.0.0.1:12026 --listen 127.0.0.1:18026 --database "$tmp/b.db" \
+  --smtp-auth-accept-any --smtp-auth-allow-insecure >/dev/null 2>&1 &
+pids="$pids $!"
+sleep 2
+
+fail=0
+check() { # name, command...
+  name=$1; shift
+  if out=$("$@" 2>&1); then echo "ok   $name: $out"; else echo "FAIL $name: $out"; fail=1; fi
+}
+check "starttls+auth" ./build/mailpit_check starttls 12025
+check "plain"         ./build/mailpit_check plain 12026
+check "auth(loopback)" ./build/mailpit_check auth 12026
+
+# What the server stored.
+for port in 18025 18026; do
+  curl -s "http://127.0.0.1:$port/api/v1/messages" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+for m in d["messages"]:
+    print("stored:", m["Subject"], "| from:", m["From"]["Name"], "| to:", m["To"][0]["Name"], m["To"][0]["Address"])
+'
+done
+id=$(curl -s "http://127.0.0.1:18025/api/v1/messages" | python3 -c 'import json,sys; print(json.load(sys.stdin)["messages"][0]["ID"])')
+body=$(curl -s "http://127.0.0.1:18025/api/v1/message/$id" | python3 -c 'import json,sys; print(json.load(sys.stdin)["Text"])')
+case "$body" in
+  *".この行は先頭がドットです。"*) echo "ok   dot-stuffing round trip" ;;
+  *) echo "FAIL dot-stuffing: $body"; fail=1 ;;
+esac
+exit $fail

@@ -49,9 +49,7 @@ module Cybertrain
           unless @transport.secure? || @transport.loopback?
             raise InsecureConnection, "refusing to send credentials without TLS"
           end
-          return failure_text(504, "server offers no AUTH PLAIN") unless offers_auth_plain?(caps)
-          token = Base64.strict_encode64("\0" + username + "\0" + password)
-          auth = command("AUTH PLAIN " + token)
+          auth = authenticate(caps, username, password)
           return failure(auth) unless auth.code == 235
         end
 
@@ -91,7 +89,7 @@ module Cybertrain
       # with CRLF (RFC 5321 4.5.2).
       def self.dot_stuff(data)
         text = data.end_with?("\r\n") ? data : data + "\r\n"
-        text = "." + text if text.getbyte(0) == 46
+        text = "." + text if text.start_with?(".")
         text.gsub("\r\n.", "\r\n..")
       end
 
@@ -109,6 +107,25 @@ module Cybertrain
           raise ConnectionLost, "connection closed before a complete reply" if line.nil?
           break if reply.add_line(line)
         end
+        reply
+      end
+
+      # AUTH PLAIN when offered, else AUTH LOGIN. Answers the final reply; a
+      # missing mechanism answers a synthetic 504.
+      def authenticate(caps, username, password)
+        if offers_auth?(caps, "PLAIN")
+          token = Base64.strict_encode64("\0" + username + "\0" + password)
+          return command("AUTH PLAIN " + token)
+        end
+        if offers_auth?(caps, "LOGIN")
+          step = command("AUTH LOGIN")
+          return step unless step.code == 334
+          step = command(Base64.strict_encode64(username))
+          return step unless step.code == 334
+          return command(Base64.strict_encode64(password))
+        end
+        reply = Reply.new
+        reply.add_line("504 server offers no supported AUTH mechanism")
         reply
       end
 
@@ -136,11 +153,11 @@ module Cybertrain
         false
       end
 
-      def offers_auth_plain?(caps)
+      def offers_auth?(caps, mechanism)
         caps.each do |line|
           up = line.upcase
           next unless up.start_with?("AUTH ") || up.start_with?("AUTH=")
-          return true if up.include?("PLAIN")
+          return true if up.include?(mechanism)
         end
         false
       end

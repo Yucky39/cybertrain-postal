@@ -12,9 +12,10 @@ module Cybertrain
       # Raises InvalidMessage when a header value holds CR, LF or NUL.
       def self.check_header_value(value)
         i = 0
-        n = value.bytesize
+        raw = value.bytes
+        n = raw.length
         while i < n
-          b = value.getbyte(i)
+          b = raw[i]
           if b == 13 || b == 10 || b == 0
             raise InvalidMessage, "header value contains a control character"
           end
@@ -26,9 +27,10 @@ module Cybertrain
       # True when every byte is printable ASCII (space included).
       def self.plain_ascii?(text)
         i = 0
-        n = text.bytesize
+        raw = text.bytes
+        n = raw.length
         while i < n
-          b = text.getbyte(i)
+          b = raw[i]
           return false if b < 32 || b > 126
           i += 1
         end
@@ -43,7 +45,8 @@ module Cybertrain
         return text if plain_ascii?(text)
 
         words = []
-        bytes = text.bytesize
+        raw = text.bytes
+        bytes = raw.length
         pos = 0
         while pos < bytes
           len = WORD_BYTES
@@ -51,7 +54,7 @@ module Cybertrain
             len = bytes - pos
           else
             # step back so the cut does not fall inside a multibyte character
-            while len > 1 && (text.getbyte(pos + len) & 0xC0) == 0x80
+            while len > 1 && (raw[pos + len] & 0xC0) == 0x80
               len -= 1
             end
           end
