@@ -10,7 +10,7 @@ module Cybertrain
     # plain fields (set them for a byte-for-byte reproducible rendering; the
     # defaults come from Message.fresh_*).
     class Message
-      attr_accessor :from, :subject, :text_body, :html_body, :date, :message_id, :boundary
+      attr_accessor :from, :subject, :text_body, :html_body, :date, :message_id, :boundary, :valid_for
       attr_reader :to, :cc, :bcc, :attachments
 
       def initialize(from)
@@ -27,6 +27,7 @@ module Cybertrain
         @date = ""
         @message_id = ""
         @boundary = ""
+        @valid_for = 0
         @attachments = Array.new(0) { Attachment.new("", "", "", "") }
       end
 

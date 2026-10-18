@@ -8,4 +8,12 @@ ok   claim is exclusive
 ok   stale claimed messages are put back
 ok   oldest messages are delivered first
 ok   QueueDelivery answers 250 queued and leaves the work to the runner
-10 tests, 38 assertions, 0 failures
+ok   a message past its valid_for is retired unsent
+ok   a message inside its valid_for is sent as usual
+ok   the valid_for limit survives a retry
+ok   a retry that would fall past the limit gives up at once
+ok   an expired message waiting for its retry time is still retired
+ok   a message without valid_for never expires
+ok   purge_failed removes only old failed messages
+ok   the spool is private to its owner
+18 tests, 58 assertions, 0 failures

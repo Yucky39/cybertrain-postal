@@ -24,11 +24,13 @@ module Cybertrain
     # One spooled message: the envelope, the retry state and the rendered data.
     # File format: "Key: value" lines, a blank line, then the data verbatim.
     class SpoolItem
-      attr_reader :id, :sender, :recipients, :attempts, :next_at, :data, :created
+      attr_reader :id, :sender, :recipients, :attempts, :next_at, :data, :created, :expires_at
       attr_accessor :last_error
 
-      def initialize(id, sender, recipients, attempts, next_at, created, data)
+      # expires_at is Unix seconds, 0 for none.
+      def initialize(id, sender, recipients, attempts, next_at, created, expires_at, data)
         @id = id
+        @expires_at = expires_at
         @sender = sender
         @recipients = recipients
         @attempts = attempts
@@ -41,7 +43,7 @@ module Cybertrain
 
       # A placeholder for "nothing there" (a lost claim, a damaged file).
       def self.none(id)
-        item = SpoolItem.new(id, "", [""].clear, 0, 0, 0, "")
+        item = SpoolItem.new(id, "", [""].clear, 0, 0, 0, 0, "")
         item.invalidate
         item
       end
@@ -56,7 +58,7 @@ module Cybertrain
       end
 
       def reschedule(attempts, next_at, error)
-        item = SpoolItem.new(@id, @sender, @recipients, attempts, next_at, @created, @data)
+        item = SpoolItem.new(@id, @sender, @recipients, attempts, next_at, @created, @expires_at, @data)
         item.last_error = error
         item
       end
@@ -68,6 +70,7 @@ module Cybertrain
         head << "Attempts: " << @attempts.to_s << "\n"
         head << "Next-At: " << @next_at.to_s << "\n"
         head << "Created: " << @created.to_s << "\n"
+        head << "Expires-At: " << @expires_at.to_s << "\n"
         head << "Last-Error: " << @last_error << "\n"
         head << "\n"
         head << @data
@@ -85,6 +88,7 @@ module Cybertrain
         attempts = 0
         next_at = 0
         created = 0
+        expires_at = 0
         last_error = ""
         head.split("\n").each do |line|
           colon = line.index(": ")
@@ -101,12 +105,14 @@ module Cybertrain
             next_at = value.to_i
           elsif key == "Created"
             created = value.to_i
+          elsif key == "Expires-At"
+            expires_at = value.to_i
           elsif key == "Last-Error"
             last_error = value
           end
         end
         return SpoolItem.none(id) if sender.empty? || recipients.empty?
-        item = SpoolItem.new(id, sender, recipients, attempts, next_at, created, data)
+        item = SpoolItem.new(id, sender, recipients, attempts, next_at, created, expires_at, data)
         item.last_error = last_error
         item
       end
@@ -121,20 +127,23 @@ module Cybertrain
     #   tmp/     being written          new/     waiting (or waiting to retry)
     #   active/  claimed by a worker    failed/  gave up (kept for inspection)
     class Spool
+      # Directories this creates are owner-only (0700) and every message file
+      # is 0600: a spooled message can hold a secret such as a reset link. A
+      # directory that already exists is left as it is, so the web application
+      # and the worker must run as the same user (or the operator prepares the
+      # directory and its permissions).
       def initialize(dir)
         @dir = dir
-        Dir.mkdir(dir) unless Dir.exist?(dir)
-        ["tmp", "new", "active", "failed"].each do |sub|
-          path = dir + "/" + sub
-          Dir.mkdir(path) unless Dir.exist?(path)
-        end
+        make_private_dir(dir)
+        ["tmp", "new", "active", "failed"].each { |sub| make_private_dir(dir + "/" + sub) }
       end
 
       # Stores the rendered message; the id is returned. now is Unix seconds.
       def enqueue(message, now)
         data = message.render
         id = now.to_s + "-" + Message.fresh_token
-        item = SpoolItem.new(id, message.from.addr, message.recipient_addrs, 0, now, now, data)
+        expires_at = message.valid_for > 0 ? now + message.valid_for : 0
+        item = SpoolItem.new(id, message.from.addr, message.recipient_addrs, 0, now, now, expires_at, data)
         store(item, "new")
         id
       end
@@ -147,7 +156,9 @@ module Cybertrain
           next unless name.end_with?(".mail")
           id = name.byteslice(0, name.bytesize - 5)
           item = read_item(id, "new")
-          ids << id if item.valid? && item.next_at <= now
+          next unless item.valid?
+          # an expired message is due at once, so the runner can retire it
+          ids << id if item.next_at <= now || (item.expires_at > 0 && item.expires_at <= now)
         end
         ids
       end
@@ -202,6 +213,25 @@ module Cybertrain
         moved
       end
 
+      # Deletes failed messages older than max_age seconds (by file time).
+      # Failed messages are kept for inspection but can hold secrets: call this
+      # now and then. Returns how many were removed.
+      def purge_failed(now, max_age)
+        removed = 0
+        Dir.children(@dir + "/failed").each do |name|
+          next unless name.end_with?(".mail")
+          path = @dir + "/failed/" + name
+          next if now - File.mtime(path).to_i < max_age
+          begin
+            File.delete(path)
+            removed += 1
+          rescue SystemCallError
+            # already gone
+          end
+        end
+        removed
+      end
+
       def count(state)
         n = 0
         Dir.children(@dir + "/" + state).each { |name| n += 1 if name.end_with?(".mail") }
@@ -213,6 +243,15 @@ module Cybertrain
       end
 
       private
+
+      # Spinel 2026.09.12 ignores the mode argument of Dir.mkdir (the directory
+      # comes out 0755), so the mode is set explicitly after creating it.
+      def make_private_dir(path)
+        return if Dir.exist?(path)
+        Dir.mkdir(path)
+        File.chmod(0700, path)
+        nil
+      end
 
       def path_of(state, id)
         @dir + "/" + state + "/" + id + ".mail"
@@ -229,6 +268,7 @@ module Cybertrain
       def store(item, state)
         tmp = @dir + "/tmp/" + item.id + ".mail"
         File.binwrite(tmp, item.to_text)
+        File.chmod(0600, tmp)
         File.rename(tmp, path_of(state, item.id))
         nil
       end
@@ -292,6 +332,10 @@ module Cybertrain
 
       # 1 delivered, 2 deferred, 3 failed
       def process(item, now)
+        if item.expires_at > 0 && now >= item.expires_at
+          @spool.fail(item, item.attempts, "expired before it could be sent")
+          return 3
+        end
         result = attempt(item)
         if result.ok?
           @spool.complete(item)
@@ -300,7 +344,12 @@ module Cybertrain
         attempts = item.attempts + 1
         error = result.code.to_s + " " + result.text
         if @policy.retry?(result) && attempts < @policy.max_attempts
-          @spool.reschedule(item, attempts, now + @policy.delay_after(attempts).ceil, error)
+          later = now + @policy.delay_after(attempts).ceil
+          if item.expires_at > 0 && later >= item.expires_at
+            @spool.fail(item, attempts, error + " (expired before the next attempt)")
+            return 3
+          end
+          @spool.reschedule(item, attempts, later, error)
           return 2
         end
         @spool.fail(item, attempts, error)

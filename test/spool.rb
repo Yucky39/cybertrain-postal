@@ -158,4 +158,85 @@ test "QueueDelivery answers 250 queued and leaves the work to the runner" do
   assert_equal 1, spool.count("new")
 end
 
+def mode_of(path)
+  File.stat(path).mode & 0777
+end
+
+def expiring(subject, seconds)
+  m = message(subject)
+  m.valid_for = seconds
+  m
+end
+
+test "a message past its valid_for is retired unsent" do
+  spool = fresh_spool
+  id = spool.enqueue(expiring("Reset", 3600), 1000)
+  run, d = runner(spool, [250], 3)
+  report = run.run_once(1000 + 3600)
+  assert_equal 1, report.failed
+  assert_equal 0, d.calls
+  assert_equal 1, spool.count("failed")
+  assert_equal "expired before it could be sent", spool.peek("failed", id).last_error
+end
+
+test "a message inside its valid_for is sent as usual" do
+  spool = fresh_spool
+  spool.enqueue(expiring("Reset", 3600), 1000)
+  run, d = runner(spool, [250], 3)
+  assert_equal 1, run.run_once(1000 + 3599).delivered
+end
+
+test "the valid_for limit survives a retry" do
+  spool = fresh_spool
+  id = spool.enqueue(expiring("Reset", 3600), 1000)
+  run, d = runner(spool, [451], 9)
+  assert_equal 1, run.run_once(1000).deferred
+  assert_equal 4600, spool.peek("new", id).expires_at
+end
+
+test "a retry that would fall past the limit gives up at once" do
+  spool = fresh_spool
+  id = spool.enqueue(expiring("Reset", 5), 1000)
+  run, d = runner(spool, [451], 9)
+  assert_equal 1, run.run_once(1000).failed
+  assert_equal 1, d.calls
+  assert spool.peek("failed", id).last_error.include?("expired before the next attempt")
+end
+
+test "an expired message waiting for its retry time is still retired" do
+  spool = fresh_spool
+  id = spool.enqueue(expiring("Reset", 100), 1000)
+  claimed = spool.claim(id)
+  spool.reschedule(claimed, 1, 5000, "451 scripted")
+  run, d = runner(spool, [250], 3)
+  assert_equal 1, run.run_once(1100).failed
+  assert_equal 0, d.calls
+end
+
+test "a message without valid_for never expires" do
+  spool = fresh_spool
+  id = spool.enqueue(message("Hi"), 1000)
+  assert_equal 0, spool.peek("new", id).expires_at
+end
+
+test "purge_failed removes only old failed messages" do
+  spool = fresh_spool
+  spool.enqueue(message("Hi"), 1000)
+  run, d = runner(spool, [550], 3)
+  run.run_once(1000)
+  assert_equal 1, spool.count("failed")
+  assert_equal 0, spool.purge_failed(Time.now.to_i, 3600)
+  assert_equal 1, spool.purge_failed(Time.now.to_i + 7200, 3600)
+  assert_equal 0, spool.count("failed")
+end
+
+test "the spool is private to its owner" do
+  dir = Dir.mktmpdir("postal-perm") + "/spool"
+  spool = Spool.new(dir)
+  id = spool.enqueue(message("Hi"), 1000)
+  assert_equal 0700, mode_of(dir)
+  assert_equal 0700, mode_of(dir + "/new")
+  assert_equal 0600, mode_of(dir + "/new/" + id + ".mail")
+end
+
 PostalTest.run!
