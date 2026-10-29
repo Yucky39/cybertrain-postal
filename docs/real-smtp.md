@@ -9,10 +9,18 @@ Needs Spinel on `PATH` (`export PATH=$HOME/.cybertrain/spinel/<release>/bin:$PAT
 
 ## Run it
 
-Type the password without echoing it, so it stays out of your shell history:
+First type the password without echoing it, so it stays out of your shell
+history. Run this line **on its own**: if you paste more lines with it, the shell
+reads them as the password and nothing is sent. Type the password, press Enter
+(nothing is shown):
 
 ```sh
 read -s POSTAL_SMTP_PASSWORD; export POSTAL_SMTP_PASSWORD
+```
+
+Then the check itself:
+
+```sh
 POSTAL_SMTP_HOST=smtp.gmail.com \
 POSTAL_SMTP_USER=you@gmail.com \
 POSTAL_MAIL_FROM=you@gmail.com \
