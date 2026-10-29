@@ -98,7 +98,7 @@ Spinel's `openssl` package is needed for SMTP over TLS, but at Spinel 2026.09.12
 - One connection per message (a fresh transport serves one delivery); no pipelining.
 - XOAUTH2 tokens are not refreshed for you.
 - The library has no template or HTML-to-text support.
-- Not yet run against a real provider (Gmail, SES, ...) with TLS and authentication: the integration tests use Mailpit only ([#5](https://github.com/Yucky39/cybertrain-postal/issues/5)).
+- Not yet run against a real provider (Gmail, SES, ...) with TLS and authentication: the integration tests use Mailpit only. [docs/real-smtp.md](docs/real-smtp.md) and `script/check-real-smtp` send one test message through a provider of your choice ([#5](https://github.com/Yucky39/cybertrain-postal/issues/5)).
 - If the server refuses some recipients but accepts the message, the others still get it and the delivery counts as a success. The spool keeps a copy in `failed/` naming the refused addresses, and `RunReport#refused` counts such messages. Nothing re-sends to the refused ones.
 - The certificate and its host name are checked (set explicitly, and an integration test shows a self-signed certificate refused). The minimum TLS version cannot be chosen: Spinel's `SSLContext` has no setting for it.
 

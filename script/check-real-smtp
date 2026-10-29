@@ -1,0 +1,11 @@
+#!/bin/sh
+# Builds and runs integration/real_smtp.rb: one test message through the SMTP
+# server named in the environment. See docs/real-smtp.md.
+#   POSTAL_SMTP_HOST=smtp.example.com POSTAL_MAIL_FROM=me@example.com \
+#   POSTAL_MAIL_TO=me@example.com POSTAL_SMTP_USER=... POSTAL_SMTP_PASSWORD=... \
+#   script/check-real-smtp
+set -eu
+cd "$(dirname "$0")/.."
+mkdir -p build
+spinel -I . integration/real_smtp.rb -o build/real_smtp >/dev/null
+exec ./build/real_smtp
