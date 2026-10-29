@@ -1,5 +1,5 @@
 # End-to-end check against a running Mailpit; run via integration/run-mailpit.
-# usage: mailpit_check MODE PORT   (MODE: plain | starttls | verify | auth | later | retry | spool | attach)
+# usage: mailpit_check MODE PORT   (MODE: plain | starttls | verify | stalltls | auth | later | retry | spool | attach)
 require "cybertrain/postal"
 require "cybertrain/postal/smtp_factory"
 
@@ -19,8 +19,8 @@ factory = SmtpDeliveryFactory.new("127.0.0.1", port, false, "client.example.com"
 # "verify" keeps the default (certificate checks on) to see a self-signed
 # certificate refused; every other mode turns the checks off for Mailpit's.
 factory.verify_cert = false unless mode == "verify"
-factory.require_tls = (mode == "verify" || mode == "starttls" || mode == "later" || mode == "spool" || mode == "attach")
-factory.credentials("user", "secret") unless mode == "plain" || mode == "retry" || mode == "verify"
+factory.require_tls = (mode == "verify" || mode == "stalltls" || mode == "starttls" || mode == "later" || mode == "spool" || mode == "attach")
+factory.credentials("user", "secret") unless mode == "plain" || mode == "retry" || mode == "verify" || mode == "stalltls"
 factory.timeout = 5
 factory.connect_timeout = 2
 
@@ -36,6 +36,22 @@ if mode == "verify"
   end
   puts "refused=#{refused}"
   exit(refused ? 0 : 1)
+end
+
+if mode == "stalltls"
+  # A server that says "go ahead" to STARTTLS and then never answers the TLS
+  # hello (what a network dropping the hello looks like): the client must give
+  # up with a reason once its timeout is over, not wait for ever.
+  factory.verify_cert = false
+  factory.timeout = 2
+  reason = ""
+  begin
+    factory.new_delivery.deliver(m)
+  rescue InsecureConnection => e
+    reason = e.message
+  end
+  puts "reason=#{reason}"
+  exit(reason.include?("timed out") ? 0 : 1)
 end
 
 if mode == "attach"

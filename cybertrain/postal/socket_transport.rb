@@ -32,6 +32,7 @@ module Cybertrain
         @verify_cert = verify_cert
         @buf = +""
         @tls = false
+        @tls_failure = ""
         @ssl = nil
         @sock = open_socket(host, port, connect_timeout)
         raise InsecureConnection, "TLS handshake failed" if implicit_tls && !start_tls
@@ -83,10 +84,19 @@ module Cybertrain
         @host == "127.0.0.1" || @host == "::1" || @host == "localhost"
       end
 
-      # False when the handshake fails, or when the server sent bytes after its
-      # 220 reply before the handshake (a STARTTLS injection attempt).
+      def tls_failure
+        @tls_failure
+      end
+
+      # False when the handshake fails or does not finish in time, or when the
+      # server sent bytes after its 220 reply before the handshake (a STARTTLS
+      # injection attempt). tls_failure says which.
       def start_tls
-        return false if @buf.bytesize > 0
+        @tls_failure = ""
+        if @buf.bytesize > 0
+          @tls_failure = "the server sent data before the handshake"
+          return false
+        end
         ctx = OpenSSL::SSL::SSLContext.new
         # Set both sides explicitly: the certificate must chain to a trusted CA
         # and name the host we connected to. Spinel's SSLContext happens to
@@ -101,8 +111,24 @@ module Cybertrain
         ssl = OpenSSL::SSL::SSLSocket.new(@sock, ctx)
         ssl.hostname = @host
         begin
-          ssl.connect
+          # One handshake step at a time, so the timeouts apply: ssl.connect would
+          # wait for a silent server for as long as it likes.
+          loop do
+            step = ssl.connect_nonblock(exception: false)
+            if step == :wait_readable
+              ready = readable?
+            elsif step == :wait_writable
+              ready = writable?
+            else
+              break
+            end
+            unless ready
+              @tls_failure = "the handshake timed out (the server sent nothing; see docs/real-smtp.md)"
+              return false
+            end
+          end
         rescue OpenSSL::SSL::SSLError, StandardError
+          @tls_failure = "the handshake failed (certificate or host name not accepted, or no common protocol)"
           return false
         end
         @ssl = ssl
@@ -155,6 +181,13 @@ module Cybertrain
         return left if @timeout <= 0
         return @timeout if left < 0.0 || @timeout < left
         left
+      end
+
+      def writable?
+        limit = wait_limit
+        return false if limit == 0.0
+        return !@sock.wait_writable(limit).nil? if limit > 0.0
+        !@sock.wait_writable.nil?
       end
 
       def readable?

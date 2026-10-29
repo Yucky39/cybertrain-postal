@@ -31,6 +31,11 @@ module Cybertrain
       def start_tls
         false
       end
+
+      # Why the last start_tls returned false ("" when it did not or is not known).
+      def tls_failure
+        ""
+      end
     end
   end
 end

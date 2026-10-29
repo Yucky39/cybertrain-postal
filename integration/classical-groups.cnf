@@ -1,0 +1,18 @@
+# OpenSSL configuration that limits the TLS key exchange to the classical groups.
+#
+# OpenSSL 3.5 offers a hybrid post-quantum group by default, which makes the TLS
+# hello much larger. Some networks (routers, firewalls, proxies) silently drop
+# it, and then the handshake with e.g. smtp.gmail.com never finishes. With this
+# file the hello is the size of older OpenSSL versions'.
+#
+#   OPENSSL_CONF=/path/to/classical-groups.cnf script/check-real-smtp
+openssl_conf = openssl_init
+
+[openssl_init]
+ssl_conf = ssl_sect
+
+[ssl_sect]
+system_default = system_default_sect
+
+[system_default_sect]
+Groups = X25519:P-256

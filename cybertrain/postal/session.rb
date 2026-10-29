@@ -41,7 +41,10 @@ module Cybertrain
           if offers?(caps, "STARTTLS")
             started = command("STARTTLS")
             return failure(started) unless started.code == 220
-            raise InsecureConnection, "TLS could not be established" unless @transport.start_tls
+            unless @transport.start_tls
+              why = @transport.tls_failure
+              raise InsecureConnection, why.empty? ? "TLS could not be established" : "TLS could not be established: " + why
+            end
             ehlo = command("EHLO " + @host)
             return failure(ehlo) unless ehlo.code == 250
             caps = ehlo.lines

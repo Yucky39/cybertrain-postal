@@ -49,6 +49,14 @@ result:  ok=true code=250 2.0.0 OK ...
 - `refused to continue: ...`: no STARTTLS offered, the handshake or certificate
   check failed, or credentials would have gone over an unencrypted connection.
   Certificate and host-name checks stay on; nothing here turns them off.
+- `refused to continue: TLS could not be established: the handshake timed out ...`:
+  the server answered STARTTLS but then never answered the TLS hello. On some
+  networks the hello of OpenSSL 3.5 (it carries a hybrid post-quantum key share and
+  is much larger) is dropped on the way. Run again with
+  `POSTAL_SMTP_CLASSICAL_GROUPS=1 script/check-real-smtp ...`, which limits the key
+  exchange to X25519 and P-256 (`integration/classical-groups.cnf`). For your own
+  program, set `OPENSSL_CONF` to that file in the environment of the process that
+  sends. Certificate checks are not affected.
 - `ok=false code=535` (or similar): the server refused the login.
 - `refused: someone@...`: the server accepted the message but not that recipient.
 

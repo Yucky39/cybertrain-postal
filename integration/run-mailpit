@@ -25,6 +25,27 @@ pids="$pids $!"
 mailpit --smtp 127.0.0.1:12026 --listen 127.0.0.1:18026 --database "$tmp/b.db" \
   --smtp-auth-accept-any --smtp-auth-allow-insecure >/dev/null 2>&1 &
 pids="$pids $!"
+# C: says yes to STARTTLS, then never answers the TLS hello.
+python3 - <<'PY' &
+import socket, threading, time
+srv = socket.socket(); srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+srv.bind(("127.0.0.1", 12027)); srv.listen(5)
+def serve(c):
+    f = c.makefile("rwb", buffering=0)
+    c.sendall(b"220 stall ESMTP\r\n")
+    for line in f:
+        cmd = line.strip().upper()
+        if cmd.startswith(b"EHLO"):
+            c.sendall(b"250-stall\r\n250 STARTTLS\r\n")
+        elif cmd == b"STARTTLS":
+            c.sendall(b"220 go ahead\r\n")
+            time.sleep(30)
+            return
+while True:
+    c, _ = srv.accept()
+    threading.Thread(target=serve, args=(c,), daemon=True).start()
+PY
+pids="$pids $!"
 sleep 2
 
 fail=0
@@ -34,6 +55,7 @@ check() { # name, command...
 }
 check "starttls+auth" ./build/mailpit_check starttls 12025
 check "self-signed certificate refused" ./build/mailpit_check verify 12025
+check "silent TLS handshake times out" ./build/mailpit_check stalltls 12027
 check "plain"         ./build/mailpit_check plain 12026
 check "auth(loopback)" ./build/mailpit_check auth 12026
 check "deliver_later+retry" ./build/mailpit_check later 12025

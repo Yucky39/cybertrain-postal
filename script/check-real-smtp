@@ -14,4 +14,9 @@ if [ -z "${LIBRARY_PATH:-}" ] && command -v brew >/dev/null 2>&1; then
 fi
 mkdir -p build
 spinel -I . integration/real_smtp.rb -o build/real_smtp >/dev/null
+# POSTAL_SMTP_CLASSICAL_GROUPS=1: see integration/classical-groups.cnf (a network that drops
+# the large TLS hello of OpenSSL 3.5 makes the handshake hang until the timeout).
+if [ "${POSTAL_SMTP_CLASSICAL_GROUPS:-}" = "1" ] && [ -z "${OPENSSL_CONF:-}" ]; then
+  export OPENSSL_CONF="$PWD/integration/classical-groups.cnf"
+fi
 exec ./build/real_smtp
