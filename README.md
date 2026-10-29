@@ -101,7 +101,6 @@ Spinel's `openssl` package is needed for SMTP over TLS, but at Spinel 2026.09.12
 - Not yet run against a real provider (Gmail, SES, ...) with TLS and authentication: the integration tests use Mailpit only ([#5](https://github.com/Yucky39/cybertrain-postal/issues/5)).
 - If some recipients are refused but the message is accepted, the delivery counts as a success and the refused addresses are not reported or kept ([#3](https://github.com/Yucky39/cybertrain-postal/issues/3)).
 - Certificate and host-name checks rely on Spinel's `SSLContext` defaults instead of being set explicitly, and the minimum TLS version cannot be chosen ([#4](https://github.com/Yucky39/cybertrain-postal/issues/4)).
-- No `SECURITY.md` yet, and CI still runs Spinel 2026.09.12 ([#6](https://github.com/Yucky39/cybertrain-postal/issues/6)). Until then, report a vulnerability by a private message to the maintainer rather than a public issue.
 
 ## Documentation
 

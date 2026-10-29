@@ -5,8 +5,9 @@ on:
   pull_request:
 
 env:
-  # Same release CyberTrain pins; see docs/m0-findings.md.
-  SPINEL_TAG: "2026.09.12"
+  # The release CyberTrain v0.3.1 pins (Cybertrain::SPINEL_TAG): a tag of the
+  # saeki-mototsune fork of matz/spinel.
+  SPINEL_TAG: "2026.10.27.7020"
   MAILPIT_VERSION: "v1.31.6"
 
 jobs:
@@ -52,7 +53,7 @@ jobs:
         if: steps.spinel-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/.local/src
-          git clone --branch "$SPINEL_TAG" --depth 1 https://github.com/matz/spinel.git ~/.local/src/spinel
+          git clone --branch "$SPINEL_TAG" --depth 1 https://github.com/saeki-mototsune/spinel.git ~/.local/src/spinel
           cd ~/.local/src/spinel
           make deps
           make -j4
@@ -104,7 +105,7 @@ jobs:
         if: steps.spinel-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/.local/src
-          git clone --branch "$SPINEL_TAG" --depth 1 https://github.com/matz/spinel.git ~/.local/src/spinel
+          git clone --branch "$SPINEL_TAG" --depth 1 https://github.com/saeki-mototsune/spinel.git ~/.local/src/spinel
           cd ~/.local/src/spinel
           make deps
           make -j4
