@@ -27,6 +27,7 @@ check() { # name, command...
   if out=$("$@" 2>&1); then echo "ok   $name: $out"; else echo "FAIL $name: $out"; fail=1; fi
 }
 check "starttls+auth" ./build/mailpit_check starttls 12025
+check "self-signed certificate refused" ./build/mailpit_check verify 12025
 check "plain"         ./build/mailpit_check plain 12026
 check "auth(loopback)" ./build/mailpit_check auth 12026
 check "deliver_later+retry" ./build/mailpit_check later 12025

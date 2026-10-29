@@ -32,6 +32,8 @@ class ScriptedDelivery < Delivery
     @sent << message.render
     raise ConnectionLost, "scripted" if code == 0
     return Result.new(true, 250, "queued", [""].clear, [""].clear) if code == 250
+    # 260: accepted for everyone but the bcc recipient.
+    return Result.new(true, 250, "queued", ["taro@example.com"], ["audit@example.com"]) if code == 260
     Result.new(false, code, "scripted", [""].clear, [""].clear)
   end
 end
@@ -90,6 +92,23 @@ test "a temporary failure is rescheduled with backoff" do
   assert_equal 1, d.calls
   assert_equal 1, run.run_once(1010).delivered
   assert_equal 0, spool.count("new")
+end
+
+test "a recipient the server refused is kept in failed, and the message still counts as delivered" do
+  spool = fresh_spool
+  id = spool.enqueue(message("Hi"), 1000)
+  run, d = runner(spool, [260], 5)
+  report = run.run_once(1000)
+  assert_equal 1, report.delivered
+  assert_equal 1, report.refused
+  assert_equal 0, report.failed
+  assert_equal 0, spool.count("new")
+  assert_equal 1, spool.count("failed")
+  assert_equal "accepted, but the server refused: audit@example.com", spool.peek("failed", id).last_error
+  other = fresh_spool
+  other.enqueue(message("Hi"), 1000)
+  clean, _ = runner(other, [250], 5)
+  assert_equal 0, clean.run_once(1000).refused
 end
 
 test "a lost connection counts as temporary" do

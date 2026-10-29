@@ -1,5 +1,5 @@
 # End-to-end check against a running Mailpit; run via integration/run-mailpit.
-# usage: mailpit_check MODE PORT   (MODE: plain | starttls | auth | later | retry | spool | attach)
+# usage: mailpit_check MODE PORT   (MODE: plain | starttls | verify | auth | later | retry | spool | attach)
 require "cybertrain/postal"
 require "cybertrain/postal/smtp_factory"
 
@@ -16,11 +16,27 @@ m.date = "Sun, 18 Oct 2026 10:00:00 +0900"
 m.message_id = mode + "@example.com"
 
 factory = SmtpDeliveryFactory.new("127.0.0.1", port, false, "client.example.com")
-factory.verify_cert = false
-factory.require_tls = (mode == "starttls" || mode == "later" || mode == "spool" || mode == "attach")
-factory.credentials("user", "secret") unless mode == "plain" || mode == "retry"
+# "verify" keeps the default (certificate checks on) to see a self-signed
+# certificate refused; every other mode turns the checks off for Mailpit's.
+factory.verify_cert = false unless mode == "verify"
+factory.require_tls = (mode == "verify" || mode == "starttls" || mode == "later" || mode == "spool" || mode == "attach")
+factory.credentials("user", "secret") unless mode == "plain" || mode == "retry" || mode == "verify"
 factory.timeout = 5
 factory.connect_timeout = 2
+
+if mode == "verify"
+  # Mailpit's certificate is self-signed for CN=localhost: with the checks on,
+  # STARTTLS must fail and nothing may be sent in the clear.
+  refused = false
+  begin
+    r = factory.new_delivery.deliver(m)
+    puts "ok=#{r.ok?} code=#{r.code}"
+  rescue InsecureConnection
+    refused = true
+  end
+  puts "refused=#{refused}"
+  exit(refused ? 0 : 1)
+end
 
 if mode == "attach"
   data = [137, 80, 78, 71, 0, 255, 254, 1].pack("C*") * 500

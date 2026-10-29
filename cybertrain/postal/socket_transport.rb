@@ -88,7 +88,16 @@ module Cybertrain
       def start_tls
         return false if @buf.bytesize > 0
         ctx = OpenSSL::SSL::SSLContext.new
-        ctx.verify_mode = OpenSSL::SSL::VERIFY_NONE unless @verify_cert
+        # Set both sides explicitly: the certificate must chain to a trusted CA
+        # and name the host we connected to. Spinel's SSLContext happens to
+        # start out that way; CRuby's does not, so no default is relied on.
+        if @verify_cert
+          ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
+          ctx.verify_hostname = true
+        else
+          ctx.verify_mode = OpenSSL::SSL::VERIFY_NONE
+          ctx.verify_hostname = false
+        end
         ssl = OpenSSL::SSL::SSLSocket.new(@sock, ctx)
         ssl.hostname = @host
         begin

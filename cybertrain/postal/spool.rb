@@ -195,6 +195,15 @@ module Cybertrain
         nil
       end
 
+      # The message was accepted, but the server refused some recipients: they
+      # get nothing. Keeps a copy in failed/ saying who, so it is neither lost
+      # nor silently dropped (the delivery itself is completed separately).
+      def record_refused(item, refused)
+        note = "accepted, but the server refused: " + refused.join(", ")
+        store(item.reschedule(item.attempts + 1, item.next_at, note), "failed")
+        nil
+      end
+
       # Puts claimed messages that nobody finished (a crashed worker) back in
       # new/ once they are older than max_age seconds. Returns how many.
       def recover_stale(now, max_age)
@@ -289,12 +298,15 @@ module Cybertrain
 
     # What one SpoolRunner pass did.
     class RunReport
-      attr_reader :delivered, :deferred, :failed
+      # refused: of the delivered messages, how many had recipients the server
+      # refused (a copy of each is in failed/).
+      attr_reader :delivered, :deferred, :failed, :refused
 
-      def initialize(delivered, deferred, failed)
+      def initialize(delivered, deferred, failed, refused = 0)
         @delivered = delivered
         @deferred = deferred
         @failed = failed
+        @refused = refused
       end
     end
 
@@ -307,12 +319,14 @@ module Cybertrain
         @spool = spool
         @factory = factory
         @policy = policy
+        @refused = 0
       end
 
       def run_once(now)
         delivered = 0
         deferred = 0
         failed = 0
+        @refused = 0
         @spool.due_ids(now).each do |id|
           item = @spool.claim(id)
           next unless item.valid?
@@ -325,7 +339,7 @@ module Cybertrain
             failed += 1
           end
         end
-        RunReport.new(delivered, deferred, failed)
+        RunReport.new(delivered, deferred, failed, @refused)
       end
 
       private
@@ -338,6 +352,10 @@ module Cybertrain
         end
         result = attempt(item)
         if result.ok?
+          unless result.rejected.empty?
+            @spool.record_refused(item, result.rejected)
+            @refused += 1
+          end
           @spool.complete(item)
           return 1
         end

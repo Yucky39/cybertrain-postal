@@ -1,6 +1,7 @@
 ok   enqueue stores the message and the runner delivers it once
 ok   bcc recipients stay in the envelope but out of the headers
 ok   a temporary failure is rescheduled with backoff
+ok   a recipient the server refused is kept in failed, and the message still counts as delivered
 ok   a lost connection counts as temporary
 ok   a permanent failure moves to failed at once
 ok   the message is given up after max_attempts
@@ -16,4 +17,4 @@ ok   an expired message waiting for its retry time is still retired
 ok   a message without valid_for never expires
 ok   purge_failed removes only old failed messages
 ok   the spool is private to its owner
-18 tests, 58 assertions, 0 failures
+19 tests, 65 assertions, 0 failures
