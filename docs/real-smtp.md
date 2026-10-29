@@ -75,4 +75,4 @@ Add a row when you have tried a provider (date, provider, port, auth, result):
 
 | Date | Provider | Port / TLS | Auth | Result |
 | --- | --- | --- | --- | --- |
-|  |  |  |  |  |
+| 2026-10-29 | Gmail (`smtp.gmail.com`, app password) | 587, STARTTLS, certificate checks on | PLAIN/LOGIN | accepted: `ok=true code=250`. Needed `POSTAL_SMTP_CLASSICAL_GROUPS=1` on the network it was tried on (without it the TLS hello was dropped). The received message's subject and body were not inspected. |
