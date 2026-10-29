@@ -8,7 +8,7 @@ No `eval`, `send` or `method_missing` anywhere, as Spinel requires. Messages are
 
 ## Requirements
 
-- Spinel 2026.09.12 (`cybertrain setup` installs it; so does building [Spinel](https://github.com/matz/spinel) yourself).
+- Spinel 2026.10.27.7020 (`cybertrain setup` installs it; so does building [Spinel](https://github.com/matz/spinel) yourself).
 - OpenSSL headers and library, **only for the part that opens an SMTP connection** (see "Do not link OpenSSL into a web server"). On macOS with Homebrew:
 
   ```sh
