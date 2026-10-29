@@ -6,6 +6,12 @@
 #   script/check-real-smtp
 set -eu
 cd "$(dirname "$0")/.."
+# On macOS the compiler does not look in Homebrew's keg-only OpenSSL: point it there.
+if [ -z "${LIBRARY_PATH:-}" ] && command -v brew >/dev/null 2>&1; then
+  if prefix=$(brew --prefix openssl@3 2>/dev/null) && [ -d "$prefix/lib" ]; then
+    export LIBRARY_PATH="$prefix/lib" CPATH="$prefix/include"
+  fi
+fi
 mkdir -p build
 spinel -I . integration/real_smtp.rb -o build/real_smtp >/dev/null
 exec ./build/real_smtp

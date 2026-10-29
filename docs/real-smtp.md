@@ -5,8 +5,7 @@ one real provider (Gmail, SES, ...) with TLS and authentication. It sends **one*
 test message, from your own machine, with your own credentials; nothing is
 stored, and the password is never printed.
 
-Needs Spinel on `PATH` and, on macOS, Homebrew's OpenSSL
-(`export LIBRARY_PATH=$(brew --prefix openssl@3)/lib CPATH=$(brew --prefix openssl@3)/include`).
+Needs Spinel on `PATH` (`export PATH=$HOME/.cybertrain/spinel/<release>/bin:$PATH`) and, on macOS, Homebrew's OpenSSL (`brew install openssl@3`). The script points the compiler at it when `LIBRARY_PATH` is not set; if you set your own, it is left alone.
 
 ## Run it
 

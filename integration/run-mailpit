@@ -7,6 +7,12 @@ tmp=$(mktemp -d)
 pids=""
 trap 'kill $pids 2>/dev/null || true; rm -rf "$tmp"' EXIT
 
+# On macOS the compiler does not look in Homebrew's keg-only OpenSSL: point it there.
+if [ -z "${LIBRARY_PATH:-}" ] && command -v brew >/dev/null 2>&1; then
+  if prefix=$(brew --prefix openssl@3 2>/dev/null) && [ -d "$prefix/lib" ]; then
+    export LIBRARY_PATH="$prefix/lib" CPATH="$prefix/include"
+  fi
+fi
 mkdir -p build
 spinel -I . integration/mailpit.rb -o build/mailpit_check >/dev/null
 openssl req -x509 -newkey rsa:2048 -nodes -keyout "$tmp/k.pem" -out "$tmp/c.pem" \
